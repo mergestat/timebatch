@@ -6,7 +6,8 @@ import (
 	"time"
 )
 
-type timeBatcher struct {
+// TimeBatcher batches messages over a time interval
+type TimeBatcher struct {
 	ticker   *time.Ticker
 	msgs     chan interface{}
 	Out      chan []interface{}
@@ -19,7 +20,7 @@ type timeBatcher struct {
 // New creates a time batcher using the provided interval. A time batcher receives messages via .Send() and emits a batch of those messages on .Out at the interval provided.
 // Close() must be called to clean up/finish the batcher when there are no more messages to send. The .Out channel will be closed when Close is called, after any final batches are sent.
 // This should allow for range-ing over the Out channel to receive time-batches of the sent messages.
-func New(interval time.Duration) *timeBatcher {
+func New(interval time.Duration) *TimeBatcher {
 	ticker := time.NewTicker(interval)
 	msgs := make(chan interface{})
 	out := make(chan []interface{})
@@ -52,7 +53,7 @@ func New(interval time.Duration) *timeBatcher {
 		}
 	}()
 
-	return &timeBatcher{
+	return &TimeBatcher{
 		ticker: ticker,
 		msgs:   msgs,
 		Out:    out,
@@ -63,7 +64,7 @@ func New(interval time.Duration) *timeBatcher {
 
 // Send sends a new message to the batcher. Note that this is BLOCKING, which means if nothing is reading from
 // the Out channel, calls to Send will block.
-func (t *timeBatcher) Send(message interface{}) {
+func (t *TimeBatcher) Send(message interface{}) {
 	if !t.isClosed {
 		t.msgs <- message
 	}
@@ -71,7 +72,7 @@ func (t *timeBatcher) Send(message interface{}) {
 
 // Close blocks until all messages sent using Send have been emitted in a batch on .Out
 // and cleans up the time batcher
-func (t *timeBatcher) Close() {
+func (t *TimeBatcher) Close() {
 	t.closed.Do(func() {
 		t.isClosed = true
 		t.cancel()
