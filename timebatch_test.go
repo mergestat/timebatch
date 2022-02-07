@@ -8,12 +8,12 @@ import (
 	"github.com/patrickdevivo/timebatch"
 )
 
-func execute(t *testing.T, expectedNumMsgs int, batchingInterval, msgInterval time.Duration) [][]interface{} {
+func execute(t *testing.T, expectedNumMsgs int, batchingInterval, msgInterval time.Duration, options ...timebatch.Option) [][]interface{} {
 	t.Helper()
 
 	batches := make([][]interface{}, 0)
 
-	b := timebatch.New(batchingInterval)
+	b := timebatch.New(batchingInterval, options...)
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
@@ -177,4 +177,54 @@ func TestSendAfterClose(t *testing.T) {
 	if len(batches[0]) != 1 {
 		t.Fatalf("expected batch to have 1 message, got %d", len(batches[0]))
 	}
+}
+
+func TestWithEarlySendEveryRow(t *testing.T) {
+	expectedNumMsgs := 30
+	batchingInterval := 20 * time.Millisecond
+	msgInterval := 1 * time.Millisecond
+
+	batches := execute(t, expectedNumMsgs, batchingInterval, msgInterval, timebatch.WithEarlySend(func(_ []interface{}) bool {
+		return true
+	}))
+
+	var numMsgs int
+	for _, b := range batches {
+		numMsgs += len(b)
+	}
+
+	if expectedNumMsgs != int(numMsgs) {
+		t.Fatalf("expected %d messages, got %d", expectedNumMsgs, int(numMsgs))
+	}
+
+	if len(batches) != expectedNumMsgs {
+		t.Fatalf("expecting %d batches, got %d", expectedNumMsgs, len(batches))
+	}
+
+	t.Log(batches)
+}
+
+func TestWithEarlySendMaxBatchSize(t *testing.T) {
+	expectedNumMsgs := 30
+	batchingInterval := 200 * time.Millisecond
+	msgInterval := 1 * time.Millisecond
+
+	batches := execute(t, expectedNumMsgs, batchingInterval, msgInterval, timebatch.WithEarlySend(func(b []interface{}) bool {
+		return len(b) >= 5
+	}))
+
+	var numMsgs int
+	for _, b := range batches {
+		numMsgs += len(b)
+	}
+
+	if expectedNumMsgs != int(numMsgs) {
+		t.Fatalf("expected %d messages, got %d", expectedNumMsgs, int(numMsgs))
+	}
+
+	if len(batches) != 6 {
+		t.Fatalf("expecting 6 batches, got %d", len(batches))
+	}
+
+	t.Log(batches)
 }
